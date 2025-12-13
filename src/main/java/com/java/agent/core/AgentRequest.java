@@ -20,4 +20,9 @@ public class AgentRequest {
      */
     private String prompt;
 
+    /**
+     * User action: null (new request), "confirm", "auto_confirm_session", "modify"
+     */
+    private String action;
+
 }

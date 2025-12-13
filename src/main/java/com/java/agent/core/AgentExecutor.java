@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Agent executor with conversation memory and automatic tool discovery
+ * Agent executor with automatic tool execution
  *
  * @author whoami
  */
@@ -27,37 +27,39 @@ public class AgentExecutor {
     private final MessageChatMemoryAdvisor messageChatMemoryAdvisor;
     private final List<AgentTool> tools;
 
-    public String execute(AgentRequest request) {
+    /**
+     * Handle chat with automatic tool execution
+     */
+    public AgentResponse chat(AgentRequest request) {
+        String conversationId = getOrGenerateConversationId(request);
+        List<ToolCallback> toolCallbacks = getToolCallbacks();
+
+        log.info("Processing chat request for conversation: {}", conversationId);
+
+        String response = builder.build()
+                .prompt()
+                .user(request.getPrompt())
+                .toolCallbacks(toolCallbacks)
+                .advisors(messageChatMemoryAdvisor)
+                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .call()
+                .content();
+
+        return AgentResponse.ok(conversationId, response);
+    }
+
+    private String getOrGenerateConversationId(AgentRequest request) {
         String conversationId = request.getConversationId();
         if (StringUtils.isBlank(conversationId)) {
             conversationId = UUID.randomUUID().toString();
             log.info("Generated new conversation ID: {}", conversationId);
-        } else {
-            log.info("Using existing conversation ID: {}", conversationId);
         }
+        return conversationId;
+    }
 
-        final String finalConversationId = conversationId;
-
-        try {
-
-            List<ToolCallback> toolCallbacks = tools.stream()
-                    .flatMap(tool -> tool.getToolCallbacks().stream())
-                    .toList();
-
-            log.info("Executing with {} tools for conversation {}", toolCallbacks.size(), conversationId);
-
-            return builder
-                    .build()
-                    .prompt()
-                    .user(request.getPrompt())
-                    .advisors(messageChatMemoryAdvisor)
-                    .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, finalConversationId))
-                    .toolCallbacks(toolCallbacks)
-                    .call()
-                    .content();
-        } catch (Exception e) {
-            log.error("Error executing agent for conversation {}: {}", finalConversationId, e.getMessage(), e);
-            throw e;
-        }
+    private List<ToolCallback> getToolCallbacks() {
+        return tools.stream()
+                .flatMap(tool -> tool.getToolCallbacks().stream())
+                .toList();
     }
 }
