@@ -7,8 +7,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * @author JLT
- * Create by 2025/12/13
+ * Base class for agent tools
  */
 public abstract class AbstractAgentTool implements AgentTool {
 
