@@ -27,3 +27,8 @@ spring:
       fail-on-empty-beans: false
     deserialization:
       fail-on-unknown-properties: false
+
+
+mybatis-plus:
+  global-config:
+    banner: false
