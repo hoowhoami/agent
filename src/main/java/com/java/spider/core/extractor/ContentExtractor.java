@@ -2,7 +2,7 @@ package com.java.spider.core.extractor;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Maps;
-import com.java.spider.core.domain.PageContent;
+import com.java.spider.core.PageContent;
 import com.java.spider.core.factory.LLMClientFactory;
 import com.java.spider.enums.LLMProvider;
 import com.java.spider.util.JsonUtils;

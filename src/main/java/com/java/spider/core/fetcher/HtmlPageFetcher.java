@@ -1,48 +1,35 @@
 package com.java.spider.core.fetcher;
 
-import com.java.spider.core.domain.PageContent;
-import com.java.spider.core.domain.ScrapeConfig;
+import com.java.spider.core.PageContent;
+import com.java.spider.core.graph.GraphConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
-/**
- * HTML page fetcher using WebClient and Jsoup
- *
- * @author whoami
- */
 @Slf4j
 @Component
-public class HtmlPageFetcher {
+public class HtmlPageFetcher implements PageFetcher {
 
     private final WebClient webClient;
 
     public HtmlPageFetcher() {
         this.webClient = WebClient.builder()
-                .codecs(configurer -> configurer
-                        .defaultCodecs()
-                        .maxInMemorySize(10 * 1024 * 1024)) // 10MB
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
                 .build();
     }
 
-    /**
-     * Fetch HTML content from URL
-     *
-     * @param config scrape configuration
-     * @return page content
-     */
-    public PageContent fetch(ScrapeConfig config) {
+    @Override
+    public boolean supports(GraphConfig config) {
+        return config.getEnableJavaScript() == null || !config.getEnableJavaScript();
+    }
+
+    @Override
+    public PageContent fetch(GraphConfig config) {
         try {
             String html = fetchHtmlContent(config);
             return parseHtml(config.getUrl(), html);
@@ -56,22 +43,18 @@ public class HtmlPageFetcher {
         }
     }
 
-    /**
-     * Fetch raw HTML content
-     */
-    private String fetchHtmlContent(ScrapeConfig config) {
+    private String fetchHtmlContent(GraphConfig config) {
         WebClient.RequestHeadersSpec<?> spec = webClient.get()
                 .uri(config.getUrl())
-                .header("User-Agent", config.getUserAgent());
+                .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
 
-        // Add custom headers
         if (config.getHeaders() != null) {
             config.getHeaders().forEach(spec::header);
         }
 
         return spec.retrieve()
                 .bodyToMono(String.class)
-                .timeout(Duration.ofMillis(config.getTimeout()))
+                .timeout(Duration.ofMillis(config.getTimeout() != null ? config.getTimeout() * 1000L : 30000L))
                 .onErrorResume(e -> {
                     log.error("Error fetching URL: {}", config.getUrl(), e);
                     return Mono.just("");
@@ -79,12 +62,8 @@ public class HtmlPageFetcher {
                 .block();
     }
 
-    /**
-     * Parse HTML content using Jsoup
-     */
     private PageContent parseHtml(String url, String html) {
         Document document = Jsoup.parse(html, url);
-
         return PageContent.builder()
                 .url(url)
                 .html(html)
@@ -93,66 +72,5 @@ public class HtmlPageFetcher {
                 .statusCode(200)
                 .success(true)
                 .build();
-    }
-
-    /**
-     * Extract text from specific CSS selector
-     */
-    public String extractText(String html, String cssSelector) {
-        Document document = Jsoup.parse(html);
-        Element element = document.selectFirst(cssSelector);
-        return element != null ? element.text() : "";
-    }
-
-    /**
-     * Extract all links from HTML
-     */
-    public List<String> extractLinks(String html, String baseUrl) {
-        Document document = Jsoup.parse(html, baseUrl);
-        Elements links = document.select("a[href]");
-
-        List<String> urls = new ArrayList<>();
-        for (Element link : links) {
-            String href = link.attr("abs:href");
-            if (!href.isEmpty()) {
-                urls.add(href);
-            }
-        }
-        return urls;
-    }
-
-    /**
-     * Extract structured data from HTML
-     */
-    public Map<String, Object> extractStructuredData(String html, Map<String, String> selectors) {
-        Document document = Jsoup.parse(html);
-        Map<String, Object> data = new HashMap<>();
-
-        selectors.forEach((key, selector) -> {
-            Element element = document.selectFirst(selector);
-            if (element != null) {
-                data.put(key, element.text());
-            }
-        });
-
-        return data;
-    }
-
-    /**
-     * Clean HTML and extract main content
-     */
-    public String extractMainContent(String html) {
-        Document document = Jsoup.parse(html);
-
-        // Remove script and style elements
-        document.select("script, style, nav, header, footer, aside").remove();
-
-        // Get main content
-        Element main = document.selectFirst("main, article, .content, #content");
-        if (main != null) {
-            return main.text();
-        }
-
-        return document.body().text();
     }
 }

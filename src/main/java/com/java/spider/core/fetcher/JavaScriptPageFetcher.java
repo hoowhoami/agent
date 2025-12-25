@@ -1,33 +1,26 @@
 package com.java.spider.core.fetcher;
 
-import com.java.spider.core.domain.PageContent;
-import com.java.spider.core.domain.ScrapeConfig;
+import com.java.spider.core.PageContent;
+import com.java.spider.core.graph.GraphConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.htmlunit.BrowserVersion;
 import org.htmlunit.WebClient;
 import org.htmlunit.html.HtmlPage;
 import org.springframework.stereotype.Component;
 
-/**
- * JavaScript-enabled page fetcher using HtmlUnit
- *
- * @author whoami
- */
 @Slf4j
 @Component
-public class JavaScriptPageFetcher {
+public class JavaScriptPageFetcher implements PageFetcher {
 
-    /**
-     * Fetch HTML content with JavaScript rendering
-     *
-     * @param config scrape configuration
-     * @return page content
-     */
-    public PageContent fetch(ScrapeConfig config) {
+    @Override
+    public boolean supports(GraphConfig config) {
+        return config.getEnableJavaScript() != null && config.getEnableJavaScript();
+    }
+
+    @Override
+    public PageContent fetch(GraphConfig config) {
         try (WebClient webClient = createWebClient(config)) {
             HtmlPage page = webClient.getPage(config.getUrl());
-
-            // Wait for JavaScript to execute
             webClient.waitForBackgroundJavaScript(10000);
 
             return PageContent.builder()
@@ -49,20 +42,14 @@ public class JavaScriptPageFetcher {
         }
     }
 
-    /**
-     * Create configured WebClient
-     */
-    private WebClient createWebClient(ScrapeConfig config) {
+    private WebClient createWebClient(GraphConfig config) {
         WebClient webClient = new WebClient(BrowserVersion.CHROME);
-
-        // Configure WebClient
         webClient.getOptions().setJavaScriptEnabled(true);
         webClient.getOptions().setCssEnabled(false);
         webClient.getOptions().setThrowExceptionOnScriptError(false);
         webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
-        webClient.getOptions().setTimeout((int) config.getTimeout().longValue());
+        webClient.getOptions().setTimeout(config.getTimeout() != null ? config.getTimeout() * 1000 : 30000);
 
-        // Set custom headers
         if (config.getHeaders() != null) {
             config.getHeaders().forEach(webClient::addRequestHeader);
         }
